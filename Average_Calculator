@@ -1,0 +1,60 @@
+from flask import Flask, jsonify
+import requests
+
+app = Flask(__name__)
+
+WINDOW_SIZE = 10
+TIMEOUT = 0.5
+API_URLS = {
+    'p': 'http://20.244.56.144/test/primes',
+    'f': 'http://20.244.56.144/test/fibo',
+    'e': 'http://20.244.56.144/test/even',
+    'r': 'http://20.244.56.144/test/rand'
+}
+
+window = []
+
+def fetch_numbers(url):
+    try:
+        response = requests.get(url, timeout=TIMEOUT)
+        if response.status_code == 200:
+            return response.json().get('numbers', [])
+    except (requests.RequestException, ValueError):
+        return []
+    return []
+
+@app.route('/numbers/<string:numberid>', methods=['GET'])
+def get_numbers(numberid):
+    if numberid not in API_URLS:
+        return jsonify({"error": "Invalid number ID"}), 400
+
+    # Fetch numbers from the third-party API
+    numbers = fetch_numbers(API_URLS[numberid])
+    
+    # Record previous state
+    window_prev_state = list(window)
+
+    # Add new unique numbers to the window
+    for number in numbers:
+        if number not in window:
+            window.append(number)
+        if len(window) > WINDOW_SIZE:
+            window.pop(0)
+
+    # Calculate average
+    if window:
+        average = sum(window) / len(window)
+    else:
+        average = 0.0
+
+    response = {
+        "windowPrevState": window_prev_state,
+        "windowCurrState": list(window),
+        "numbers": numbers,
+        "avg": round(average, 2)
+    }
+
+    return jsonify(response)
+
+if __name__ == '_main_':
+    app.run(port=9876)
